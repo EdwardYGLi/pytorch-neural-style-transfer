@@ -23,13 +23,6 @@ def build_loss(neural_net, optimizing_img, target_representations, content_featu
         current_content_representation = current_set_of_feature_maps[content_feature_maps_index].squeeze(axis=0)
         content_loss = torch.nn.MSELoss(reduction='mean')(target_content_representation, current_content_representation)
 
-        content_style_loss = 0.0
-        current_style_representation = [utils.gram_matrix(x) for cnt, x in enumerate(current_set_of_feature_maps) if cnt in content_feature_maps_index]
-        for gram_gt, gram_hat in zip(target_style_representation, current_style_representation):
-            content_style_loss += torch.nn.MSELoss(reduction='sum')(gram_gt[0], gram_hat[0])
-        content_style_loss /= len(target_style_representation)
-
-
         style_loss = 0.0
         current_style_representation = [utils.gram_matrix(x) for cnt, x in enumerate(current_set_of_feature_maps) if cnt in style_feature_maps_indices]
         for gram_gt, gram_hat in zip(target_style_representation, current_style_representation):
@@ -38,7 +31,7 @@ def build_loss(neural_net, optimizing_img, target_representations, content_featu
 
         tv_loss = utils.total_variation(optimizing_img)
 
-        total_loss += config['content_weight'] * content_style_loss + config['style_weight'] * style_loss + config['tv_weight'] * tv_loss
+        total_loss += config['content_weight'] * content_loss + config['style_weight'] * style_loss + config['tv_weight'] * tv_loss
         total_content_loss += content_loss
         total_style_loss += style_loss
         total_tv_loss += tv_loss
@@ -95,9 +88,9 @@ def neural_style_transfer(config):
     content_img_set_of_feature_maps = neural_net(content_img)
     style_img_set_of_feature_maps = neural_net(style_img)
 
-    target_content_representation = [content_img_set_of_feature_maps[content_feature_maps_index_name[0]].squeeze(axis=0),[utils.gram_matrix(x) for cnt, x in enumerate(content_img_set_of_feature_maps) if cnt in content_feature_maps_index_name[0]]]
+    target_content_representation = [content_img_set_of_feature_maps[content_feature_maps_index_name[0]].squeeze(axis=0),[utils.gram_matrix(x) for cnt, x in enumerate(content_img_set_of_feature_maps) if cnt in style_feature_maps_indices_names[0]]]
 
-    target_style_representation = [style_feature_maps_indices_names[content_feature_maps_index_name[0]].squeeze(axis=0),[utils.gram_matrix(x) for cnt, x in enumerate(style_img_set_of_feature_maps) if cnt in style_feature_maps_indices_names[0]]]
+    target_style_representation = [style_img_set_of_feature_maps[content_feature_maps_index_name[0]].squeeze(axis=0),[utils.gram_matrix(x) for cnt, x in enumerate(style_img_set_of_feature_maps) if cnt in style_feature_maps_indices_names[0]]]
     target_representations = [target_content_representation, target_style_representation]
 
     # magic numbers in general are a big no no - some things in this code are left like this by design to avoid clutter
