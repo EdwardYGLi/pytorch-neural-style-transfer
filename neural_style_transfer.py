@@ -10,15 +10,15 @@ import argparse
 
 
 def build_loss(neural_net, optimizing_img, target_representations, content_feature_maps_index, style_feature_maps_indices, config):
-    total_loss = 0 
     total_content_loss = 0 
     total_style_loss = 0
-    total_tv_loss = 0 
+
+    current_set_of_feature_maps = neural_net(optimizing_img)
+
     for representation in target_representations:
         target_content_representation = representation[0]
         target_style_representation = representation[1]
 
-        current_set_of_feature_maps = neural_net(optimizing_img)
 
         current_content_representation = current_set_of_feature_maps[content_feature_maps_index].squeeze(axis=0)
         content_loss = torch.nn.MSELoss(reduction='mean')(target_content_representation, current_content_representation)
@@ -29,14 +29,14 @@ def build_loss(neural_net, optimizing_img, target_representations, content_featu
             style_loss += torch.nn.MSELoss(reduction='sum')(gram_gt[0], gram_hat[0])
         style_loss /= len(target_style_representation)
 
-        tv_loss = utils.total_variation(optimizing_img)
-
-        total_loss += config['content_weight'] * content_loss + config['style_weight'] * style_loss + config['tv_weight'] * tv_loss
         total_content_loss += content_loss
         total_style_loss += style_loss
-        total_tv_loss += tv_loss
 
-    return total_loss, total_content_loss, total_style_loss, total_tv_loss
+    tv_loss = utils.total_variation(optimizing_img)
+    total_loss = config['content_weight'] * total_content_loss + config['style_weight'] * total_style_loss + config['tv_weight'] * tv_loss
+        
+
+    return total_loss, total_content_loss, total_style_loss, tv_loss
 
 
 def make_tuning_step(neural_net, optimizer, target_representations, content_feature_maps_index, style_feature_maps_indices, config):
@@ -64,8 +64,8 @@ def neural_style_transfer(config):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    content_img = utils.prepare_img(content_img_path, config['height'], device)
-    style_img = utils.prepare_img(style_img_path, config['height'], device)
+    content_img = utils.prepare_img(content_img_path, (config['height'],config['height']), device)
+    style_img = utils.prepare_img(style_img_path, (config['height'],config['height']), device)
 
     if config['init_method'] == 'random':
         # white_noise_img = np.random.uniform(-90., 90., content_img.shape).astype(np.float32)
@@ -187,4 +187,4 @@ if __name__ == "__main__":
     results_path = neural_style_transfer(optimization_config)
 
     # uncomment this if you want to create a video from images dumped during the optimization procedure
-    # create_video_from_intermediate_results(results_path, img_format)
+    create_video_from_intermediate_results(results_path, img_format)
