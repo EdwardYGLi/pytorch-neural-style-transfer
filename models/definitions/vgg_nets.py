@@ -15,7 +15,7 @@ class Vgg16(torch.nn.Module):
         super().__init__()
         vgg_pretrained_features = models.vgg16(pretrained=True, progress=show_progress).features
         self.layer_names = ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3']
-        self.content_feature_maps_index = 1  # relu2_2
+        self.content_feature_maps_index = list(range(len(self.layer_names))) #1  # relu2_2
         self.style_feature_maps_indices = list(range(len(self.layer_names)))  # all layers used for style representation
 
         self.slice1 = torch.nn.Sequential()
@@ -173,7 +173,7 @@ class Vgg19(torch.nn.Module):
         else:
             self.layer_names = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv4_2', 'conv5_1']
             self.offset = 0
-        self.content_feature_maps_index = 4  # conv4_2
+        self.content_feature_maps_index = list(range(len(self.layer_names))) #4  # conv4_2
         # all layers used for style representation except conv4_2
         self.style_feature_maps_indices = list(range(len(self.layer_names)))
         self.style_feature_maps_indices.remove(4)  # conv4_2
