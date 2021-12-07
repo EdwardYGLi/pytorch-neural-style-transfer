@@ -15,19 +15,23 @@ def build_loss(neural_net, optimizing_img, target_representations, content_featu
 
     current_set_of_feature_maps = neural_net(optimizing_img)
 
-    for representation in target_representations:
+    for i, representation in enumerate(target_representations):
         target_content_representation = representation[0]
         target_style_representation = representation[1]
 
-
-        current_content_representation = current_set_of_feature_maps[content_feature_maps_index].squeeze(axis=0)
-        content_loss = torch.nn.MSELoss(reduction='mean')(target_content_representation, current_content_representation)
-
+        loss_multiplier = config["balance_weight"] if i==0 else 1-config["balance_weight"]
+        if i == 0:
+            current_content_representation = current_set_of_feature_maps[content_feature_maps_index].squeeze(axis=0)
+            content_loss = loss_multiplier* torch.nn.MSELoss(reduction='mean')(target_content_representation, current_content_representation)
+        else:
+            content_loss = 0 
+            
         style_loss = 0.0
         current_style_representation = [utils.gram_matrix(x) for cnt, x in enumerate(current_set_of_feature_maps) if cnt in style_feature_maps_indices]
         for gram_gt, gram_hat in zip(target_style_representation, current_style_representation):
             style_loss += torch.nn.MSELoss(reduction='sum')(gram_gt[0], gram_hat[0])
         style_loss /= len(target_style_representation)
+        style_loss *= loss_multiplier
 
         total_content_loss += content_loss
         total_style_loss += style_loss
@@ -109,7 +113,7 @@ def neural_style_transfer(config):
             total_loss, content_loss, style_loss, tv_loss = tuning_step(optimizing_img)
             with torch.no_grad():
                 print(f'Adam | iteration: {cnt:03}, total loss={total_loss.item():12.4f}, content_loss={config["content_weight"] * content_loss.item():12.4f}, style loss={config["style_weight"] * style_loss.item():12.4f}, tv loss={config["tv_weight"] * tv_loss.item():12.4f}')
-                utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=False)
+                utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=config['show_image'])
     elif config['optimizer'] == 'lbfgs':
         # line_search_fn does not seem to have significant impact on result
         optimizer = LBFGS((optimizing_img,), max_iter=num_of_iterations['lbfgs'], line_search_fn='strong_wolfe')
@@ -124,12 +128,14 @@ def neural_style_transfer(config):
                 total_loss.backward()
             with torch.no_grad():
                 print(f'L-BFGS | iteration: {cnt:03}, total loss={total_loss.item():12.4f}, content_loss={config["content_weight"] * content_loss.item():12.4f}, style loss={config["style_weight"] * style_loss.item():12.4f}, tv loss={config["tv_weight"] * tv_loss.item():12.4f}')
-                utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=False)
+                utils.save_and_maybe_display(optimizing_img, dump_path, config, cnt, num_of_iterations[config['optimizer']], should_display=config['show_image'])
 
             cnt += 1
             return total_loss
 
         optimizer.step(closure)
+
+    utils.save_and_maybe_display(optimizing_img, dump_path, config, num_of_iterations[config['optimizer']]-1, num_of_iterations[config['optimizer']], should_display=config['show_image'])
 
     return dump_path
 
@@ -156,11 +162,13 @@ if __name__ == "__main__":
     parser.add_argument("--content_weight", type=float, help="weight factor for content loss", default=1e5)
     parser.add_argument("--style_weight", type=float, help="weight factor for style loss", default=3e4)
     parser.add_argument("--tv_weight", type=float, help="weight factor for total variation loss", default=1e0)
+    parser.add_argument("--balance_weight", type=float, help="weight for balancing between images", default=0.5)
 
     parser.add_argument("--optimizer", type=str, choices=['lbfgs', 'adam'], default='lbfgs')
     parser.add_argument("--model", type=str, choices=['vgg16', 'vgg19'], default='vgg19')
     parser.add_argument("--init_method", type=str, choices=['random', 'content', 'style'], default='content')
     parser.add_argument("--saving_freq", type=int, help="saving frequency for intermediate images (-1 means only final)", default=-1)
+    parser.add_argument("--show_image", help="display image or not", action="store_true")
     args = parser.parse_args()
 
     # some values of weights that worked for figures.jpg, vg_starry_night.jpg (starting point for finding good images)
